@@ -1,4 +1,4 @@
-# Secret_Diary
+# Email Client Project
 Project of The Complete Web Developer Course 2.0
 
 ## Description

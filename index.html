@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Email App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+    <link rel="stylesheet" href="app.min.css">
+	<link rel="shortcut icon" href="#" />
+    <style>
+      .home-topbar {
+		background-color: blue;
+	  }
+	  .hidden {
+		display: none;
+	  }
+	  .success {
+		border: #7F7 2px solid;
+	  }
+	  .warning {
+		border: red 2px solid;
+	  }
+	  
+    </style>
+  </head>
+
+  <body>
+    <div class="app-page" data-page="home">
+      <div class="app-topbar home-topbar">
+        <div class="app-title">Sent An Email</div>
+      </div>
+      <div class="app-content">
+		<div class="app-section">
+          <div>Click below to sent an email!</div>
+        </div>
+
+        <div class="app-section">
+          <div class="app-button" data-target="emailPage" data-target-args='{"email":""}'>Sent to new user</div>
+        </div>
+		<div class="app-section" id="recipients"></div>
+      </div>
+    </div>
+
+    <div class="app-page" data-page="emailPage">
+      <div class="app-topbar">
+        <div class="app-button right" data-target="home">Back</div>
+        <div class="app-title">Sent Email</div>
+      </div>
+      <div class="app-content">
+		<form method="post" id="myForm">
+			<div id="alert" class="app-section"></div>
+			<div class="app-section">
+			  <p>From:</p>	
+			  <input type="email" id="from" class="app-input" placeholder="You'r Email Address">
+			</div>
+			<div class="app-section">
+			  <p>To:</p>
+			  <input id="to" class="app-input" placeholder="Recipient Email Address">
+			</div>
+			<div class="app-section">
+			  <input id="subject" class="app-input" placeholder="Subject">
+			  <textarea id="message" class="app-input" placeholder="Message"></textarea>
+			  <div class="sent app-button green">Send</div>
+			</div>
+		</form>
+      </div>
+    </div>
+
+	<!--<script src="zepto.js"></script>-->
+	<script
+  src="https://code.jquery.com/jquery-3.4.1.min.js"
+  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+  crossorigin="anonymous"></script>
+    <script src="app.min.js"></script>
+    <script>
+      App.controller('home', function (page) {
+
+		function loadRecipients (){
+			if (localStorage.recipientsEmail) {
+				var recipientsArray = JSON.parse(localStorage.recipientsEmail);
+				for (i = 0; i < recipientsArray.length; i++) {
+					$(page).find("#recipients").append('<div class="app-button" data-target="emailPage" data-target-args=\'{"email":"'+recipientsArray[i]+'"}\'>' + recipientsArray[i] + '</div>');
+					//console.log("loaded recipient from array");
+				}
+				$(page).find("#recipients").show();
+			} else {
+				$(page).find("#recipients").hide();
+			}
+		}
+		if (typeof localStorage !== 'undefined') {
+			loadRecipients();
+		} else {
+			$(page).find("#recipients").hide();
+		}
+      });
+
+      App.controller('emailPage', function (page, emailPage) {
+
+		function validateEmail(email) {
+		var re = /\S+@\S+\.\S+/;
+		return re.test(email);
+		}
+		
+		function addRecipientEmail(email) {
+		var recipientsArray = new Array(); 
+			if (typeof localStorage !== 'undefined') {
+			
+				if (localStorage.recipientsEmail) {
+
+					recipientsArray = JSON.parse(localStorage.recipientsEmail);
+					for (i = 0; i < recipientsArray.length; i++) {
+						if (recipientsArray[i] == email) {
+							var emailKnown = true;
+						}
+					}
+					
+					if (!emailKnown) {
+						recipientsArray.push(email);
+						recipientsArray.sort();
+						localStorage.setItem("recipientsEmail", JSON.stringify(recipientsArray));
+						//console.log("email address not found in local storage");
+					}
+				} else {
+					recipientsArray.push(email);
+					localStorage.setItem("recipientsEmail", JSON.stringify(recipientsArray));
+					//console.log("No addresses in LS, added " + email);
+				}
+			}
+		}
+		
+		function addUserEmail(email){
+			if (!localStorage.userEmail || localStorage.getItem("userEmail") != email) {
+				localStorage.setItem ("userEmail", email);
+				//alert(localStorage.userEmail+" saved to local storage");
+			}
+		}
+		
+		if (typeof localStorage !== 'undefined' && localStorage.userEmail) {
+			$(page).find("#from").val(localStorage.getItem("userEmail"));
+		}
+		
+		$(page).find("#alert").hide();
+		
+		$(page).find("#to").val(emailPage.email);
+		//console.log(emailPage.email);
+		
+        $(page).find(".sent")
+		.on("click", function(){
+		$(page).find("#alert").show();
+		//check if all fields are filled
+			if ($("#from").val() == "" || $("#to").val() == "" || $("#subject").val() == "" || $("#message").val() == ""){
+				if ($("#alert").hasClass("success")){
+					$("#alert").removeClass("success");
+				}
+				$("#alert").addClass("warning");
+				$("#alert").html("Not all fields are filled");
+			} else { //check if emails are valid
+				if (validateEmail($("#from").val()) && validateEmail($("#to").val())) {
+					
+					$.ajax({
+						url:'sentEmail.php',
+						method:'POST',
+						data:{
+							fromEmail: $("#from").val(),
+							toEmail: $("#to").val(),
+							subject: $("#subject").val(),
+							message: $("#message").val()
+						},
+						dataType: "JSON",
+						success: function(data) {
+							
+							if ($("#alert").hasClass("warning")){
+								$("#alert").removeClass("warning");
+							}
+							if (data.error != "") {
+								if (typeof localStorage !== 'undefined') {
+									addUserEmail($("#from").val());
+									addRecipientEmail($("#to").val());
+								} else {
+									alert("Data coul'd not be saved");
+								}
+								$("#alert").addClass("success");
+								$("#alert").html(data.message);
+								$('#myForm').trigger("reset");
+								
+								if (typeof localStorage !== 'undefined' && localStorage.userEmail) {
+									$(page).find("#from").val(localStorage.getItem("userEmail"));
+								}
+
+
+							} else {
+								$("#alert").addClass("warning");
+								$("#alert").html(data.error);
+							}
+						},
+						error: function(data) {
+							alert("error 2: something went wrong please try again later (AJAX)" + data);
+						}
+					})
+				
+				} else {
+					if ($("#alert").hasClass("success")){
+						$("#alert").removeClass("success");
+					}
+					$("#alert").addClass("warning");
+					$("#alert").html("One or both email addresses are not valid");
+				}
+			}
+		});
+      });
+
+      try {
+        App.restore();
+      } catch (err) {
+        App.load('home');
+      }
+    </script>
+  </body>
+</html>
